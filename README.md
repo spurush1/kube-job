@@ -6,117 +6,88 @@ This guide explains how to run the project locally using Minikube.
 - [Minikube](https://minikube.sigs.k8s.io/docs/start/) installed
 - [Docker](https://docs.docker.com/get-docker/) installed
 - [Python 3](https://www.python.org/) installed
+- [Kubectl](https://kubernetes.io/docs/tasks/tools/) installed
 
-## 1. Start Minikube
-Start Minikube with the Docker driver:
-```bash
-minikube start --driver=docker
-```
+## 🚀 Quick Start (Helper Script)
+We provide a helper script `manage.sh` to simplify operations.
 
-## 2. Point Docker to Minikube
-**Crucial Step**: Configure your shell to use Minikube's Docker daemon. This allows Minikube to find the images you build locally.
-```bash
-eval $(minikube -p minikube docker-env)
-```
+1. **Start Minikube**:
+    ```bash
+    minikube start --driver=docker
+    eval $(minikube docker-env)
+    ```
 
-## 3. Build Docker Images
-Build the images for the Producer, Worker, and Scaler components. Run these commands from the project root (`learning/kube-job`):
+2. **Deploy Everything**:
+    ```bash
+    ./manage.sh up
+    ```
+    This builds the images and deploys RabbitMQ, Producer, and Scaler.
 
-```bash
-docker build -t producer:latest ./producer
-docker build -t worker:latest ./worker
-docker build -t scaler:latest ./scaler
-```
+3. **Access Services**:
+    ```bash
+    ./manage.sh forward
+    # This exposes:
+    # - Producer: localhost:8000
+    # - Dashboard: localhost:8080
+    # - RabbitMQ: localhost:15672
+    ```
 
-## 4. Deploy to Kubernetes
-Apply the Kubernetes manifests to deploy RabbitMQ, the Producer, and the Scaler:
+## 📊 Dashboard
+Open **[http://localhost:8080](http://localhost:8080)** to view the enhanced dashboard.
 
-```bash
-kubectl apply -f infra/k8s/rabbitmq.yaml
-kubectl apply -f infra/k8s/producer.yaml
-kubectl apply -f infra/k8s/scaler.yaml
-```
+### Features
+- **Real-Time Cards**: View Queue Depth, Unacknowledged Messages (active processing), Active Jobs, and Total Consumed.
+- **Job Table**: List of all worker jobs with their status and individual processed count.
+- **Logs**: Click "View Logs" on any job to debug it instantly.
+- **Resource Monitoring**: Tracks Scaler CPU/Memory usage.
 
-Wait a few moments for the pods to start. You can check their status with:
-```bash
-kubectl get pods
-```
+## ⚙️ Scaling Behavior
+1. **Burst Scaling**: If the queue depth is high (>40), the system spawns **multiple workers (up to 5)** at once to ramp up quickly.
+2. **Safe Scale Down**: The system monitors **Unacknowledged Messages**. It will NEVER delete a worker that is busy processing. It only scales down when the system is completely idle (Queue=0, Unacked=0) for 30 seconds.
 
-## 5. Generate Test Data
-Generate a sample CSV file to upload:
+## 🧪 Testing the System
+
+### 1. Generate Test Data
 ```bash
 python data/generate_data.py
-# This creates a 'data.csv' file in the current directory
+# Creates 'data.csv'
 ```
 
-## 6. Access the Producer
-Port-forward the Producer service to access its API from your local machine:
-```bash
-kubectl port-forward service/producer 8000:8000
-```
-*Keep this terminal open.*
-
-## 7. Trigger the Job
-In a **new terminal window**, upload the generated data to the Producer:
-
+### 2. Trigger Jobs
 ```bash
 curl -X POST -F "file=@data.csv" http://localhost:8000/upload
 ```
 
-## 8. Observe Scaling
-Monitor the Scaler logs and the creation of Worker jobs:
+### 3. Observe
+- Watch the **Dashboard** at `localhost:8080`.
+- Use the CLI dashboard helper:
+  ```bash
+  ./dashboard.sh -w
+  ```
+
+## 🛠️ Manual Operations (Without Script)
+If you prefer running commands manually:
 
 ```bash
-# Watch pods (you should see worker-job-xxxxx pods appearing)
-kubectl get pods -w
+# Build
+docker build -t producer:latest ./producer
+docker build -t worker:latest ./worker
+docker build -t scaler:latest ./scaler
 
-# Check Scaler logs
-kubectl logs -f deployment/scaler
+# Deploy
+kubectl apply -f infra/k8s/rabbitmq.yaml
+kubectl apply -f infra/k8s/producer.yaml
+kubectl apply -f infra/k8s/scaler.yaml
+
+# Port Forward
+kubectl port-forward service/producer 8000:8000 &
+kubectl port-forward service/scaler 8080:8000 &
 ```
-
-The Scaler will check the RabbitMQ queue depth. When it exceeds 20 messages, it will start spawning worker jobs.
 
 ## FAQ
 
-### 1. What happens if I scale to 10,000 jobs but run out of memory?
-The system is designed to be resilient to resource exhaustion. Kubernetes controls the scheduling:
-- If you request more Jobs than your cluster (or Minikube VM) can handle, the extra Pods will go into a **`Pending`** state.
-- They will wait in the queue until resources (Memory/CPU) become available (e.g., when other workers finish).
-- The system **will not crash**; it will simply saturate the available resources and process at maximum capacity.
+### 1. What happens if I scale to 10,000 jobs?
+Kubernetes puts extra Pods in **`Pending`** state until resources are available. The system processes at maximum capacity without crashing.
 
-### 2. What happens if a worker dies while processing a message?
-The system guarantees **at-least-once delivery** using RabbitMQ's acknowledgement mechanism:
-- Workers only send an "Wait, I'm done" (Ack) signal to RabbitMQ *after* they have fully processed the message.
-- If a pod crashes, is killed, or the node fails *before* sending the Ack, RabbitMQ detects the lost connection.
-- RabbitMQ automatically **re-queues the message**.
-- Another available worker will pick up that same message and process it. No data is lost.
-
-## Helpful Commands
-
-### Monitoring
-```bash
-# Watch all pods update in real-time
-kubectl get pods -w
-
-# View logs of the scaler
-kubectl logs -f deployment/scaler
-
-# View logs of a specific worker (replace pod name)
-kubectl logs worker-job-xxxxx
-
-# View queue status via RabbitMQ Management UI
-kubectl port-forward service/rabbitmq 15672:15672
-# Then open http://localhost:15672 (User: guest, Pass: guest)
-```
-
-### Debugging
-```bash
-# Access shell inside a pod
-kubectl exec -it pod-name -- /bin/bash
-
-# Describe a pod to see why it's Pending or failing
-kubectl describe pod pod-name
-
-# Delete all worker jobs manually (Cleanup)
-kubectl delete jobs -l app=worker-job
-```
+### 2. What if a worker crashes?
+RabbitMQ guarantees **at-least-once delivery**. If a worker crashes before Ack, the message is requeued and processed by another worker.
