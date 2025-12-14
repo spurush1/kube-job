@@ -71,6 +71,31 @@ export default function Overview({ metrics }) {
                         </div>
                     </div>
                 </div>
+
+                {/* Scaling Status (Full Width) */}
+                <div className="lg:col-span-3 bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Activity size={20} className="text-blue-600" /> Scaling Status</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {metrics.scaling_status && Object.entries(metrics.scaling_status).map(([type, status]) => (
+                            <div key={type} className="flex justify-between items-center p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                <div>
+                                    <div className="font-bold text-slate-700 capitalize">{type}</div>
+                                    <div className="text-sm text-slate-500">{status.active} Active Workers</div>
+                                </div>
+                                <div className="text-right">
+                                    {status.is_idle ? (
+                                        <>
+                                            <div className="text-orange-600 font-mono font-bold text-sm">Idle: {status.idle_seconds}s</div>
+                                            <div className="text-xs text-slate-400">Scale down in: {status.scale_down_in}s</div>
+                                        </>
+                                    ) : (
+                                        <div className="text-green-600 font-bold text-sm flex items-center gap-1"><Zap size={14} /> Processing</div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             </div>
         </div>
     );

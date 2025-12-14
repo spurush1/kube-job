@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { format } from 'date-fns';
-import { X } from 'lucide-react';
+import { XCircle } from 'lucide-react';
+import SmartTable from './SmartTable';
 
 export default function AuditView({ baseUrl }) {
     const [audits, setAudits] = useState([]);
@@ -25,6 +26,16 @@ export default function AuditView({ baseUrl }) {
         return () => clearInterval(interval);
     }, []);
 
+    const columns = [
+        { key: 'message_id', label: 'Message ID', width: 220, render: (row) => <span className="font-mono text-slate-600 hover:text-blue-600 font-bold" title={row.message_id}>{row.message_id}</span> },
+        { key: 'job_type', label: 'Job Type', width: 140 },
+        { key: 'worker_pod', label: 'Worker Pod', width: 180, render: (row) => <span className="font-mono text-xs">{row.worker_pod}</span> },
+        { key: 'queued_at', label: 'Queued At', width: 120, render: (row) => <span className="text-slate-500">{formatDate(row.queued_at)}</span> },
+        { key: 'processed_at', label: 'Processed At', width: 120, render: (row) => <span className="text-slate-500">{formatDate(row.processed_at)}</span> },
+        { key: 'duration_ms', label: 'Duration', width: 100, render: (row) => <span className="font-bold text-slate-700">{row.duration_ms}ms</span> },
+        { key: 'status', label: 'Status', width: 100, render: () => <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">Done</span> }
+    ];
+
     if (loading && audits.length === 0) return <div className="p-6 text-center text-slate-400">Loading audit trail...</div>;
 
     return (
@@ -33,41 +44,13 @@ export default function AuditView({ baseUrl }) {
                 <h2 className="text-lg font-bold text-slate-800">Message Audit Trail</h2>
                 <button onClick={fetchAudit} className="text-sm text-blue-600 hover:underline">Refresh</button>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-sm">
-                <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
-                        <tr>
-                            <th className="px-4 py-3">Message ID</th>
-                            <th className="px-4 py-3">Job Type</th>
-                            <th className="px-4 py-3">Worker Pod</th>
-                            <th className="px-4 py-3">Queued At</th>
-                            <th className="px-4 py-3">Processed At</th>
-                            <th className="px-4 py-3">Duration</th>
-                            <th className="px-4 py-3">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {audits.map(row => (
-                            <tr key={row.id}
-                                onClick={() => setSelectedAudit(row)}
-                                className="hover:bg-blue-50 cursor-pointer transition-colors group"
-                            >
-                                <td className="px-4 py-3 font-mono text-xs text-slate-600 group-hover:text-blue-600 font-bold" title={row.message_id}>
-                                    {row.message_id.slice(0, 8)}...
-                                </td>
-                                <td className="px-4 py-3">{row.job_type}</td>
-                                <td className="px-4 py-3 font-mono text-xs">{row.worker_pod}</td>
-                                <td className="px-4 py-3 text-slate-500">{formatDate(row.queued_at)}</td>
-                                <td className="px-4 py-3 text-slate-500">{formatDate(row.processed_at)}</td>
-                                <td className="px-4 py-3 font-bold text-slate-700">{row.duration_ms}ms</td>
-                                <td className="px-4 py-3">
-                                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-bold">Done</span>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
+
+            <SmartTable
+                columns={columns}
+                data={audits}
+                onRowClick={setSelectedAudit}
+                showRowNumber={true}
+            />
 
             {/* Drill Down Modal */}
             {selectedAudit && (
@@ -106,7 +89,7 @@ function AuditDetailModal({ audit, baseUrl, onClose }) {
                     <h3 className="font-bold text-lg text-slate-800">Audit Detail</h3>
                     <div className="text-xs text-slate-500 font-mono">{audit.message_id}</div>
                 </div>
-                <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full"><X size={20} /></button>
+                <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full"><XCircle size={20} /></button>
             </div>
 
             <div className="p-4 grid grid-cols-2 gap-4 bg-white border-b border-slate-100">

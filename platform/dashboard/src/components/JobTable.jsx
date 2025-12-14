@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Terminal, X } from 'lucide-react';
 import axios from 'axios';
+import SmartTable from './SmartTable';
 
 export default function JobTable({ jobs, baseUrl }) {
     const [selectedJob, setSelectedJob] = useState(null);
@@ -14,6 +15,29 @@ export default function JobTable({ jobs, baseUrl }) {
         setSelectedJob(jobName);
         setLogs('Connecting to log stream...');
     };
+
+    // Columns Definition
+    const columns = [
+        { key: 'name', label: 'Job Name', width: 200, render: (row) => <span className="font-mono text-slate-700">{row.name}</span> },
+        { key: 'type', label: 'Type', width: 120, render: (row) => <span className="text-slate-600">{row.type || 'generic'}</span> },
+        { key: 'status', label: 'Status', width: 120, render: (row) => <StatusBadge status={row.status} /> },
+        { key: 'start_time', label: 'Start Time', width: 120, render: (row) => <span className="text-slate-500">{row.start_time}</span> },
+        { key: 'processed', label: 'Processed', width: 100, render: (row) => <span className="font-bold text-slate-700">{row.processed}</span> },
+        {
+            key: 'actions',
+            label: 'Actions',
+            width: 100,
+            sortable: false,
+            render: (row) => (
+                <button
+                    onClick={(e) => { e.stopPropagation(); handleViewLogs(row.name); }}
+                    className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+                >
+                    <Terminal size={14} /> Logs
+                </button>
+            )
+        }
+    ];
 
     // Poll logs when a job is selected
     React.useEffect(() => {
@@ -41,40 +65,12 @@ export default function JobTable({ jobs, baseUrl }) {
     }, [logs]);
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50 text-slate-500 font-semibold text-sm">
-                    <tr>
-                        <th className="px-6 py-4">Job Name</th>
-                        <th className="px-6 py-4">Type</th>
-                        <th className="px-6 py-4">Status</th>
-                        <th className="px-6 py-4">Start Time</th>
-                        <th className="px-6 py-4">Processed</th>
-                        <th className="px-6 py-4">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-sm">
-                    {jobs.map(job => (
-                        <tr key={job.name} className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 font-mono text-slate-700">{job.name}</td>
-                            <td className="px-6 py-4 text-slate-600">{job.type || 'generic'}</td>
-                            <td className="px-6 py-4">
-                                <StatusBadge status={job.status} />
-                            </td>
-                            <td className="px-6 py-4 text-slate-500">{job.start_time}</td>
-                            <td className="px-6 py-4 font-bold text-slate-700">{job.processed}</td>
-                            <td className="px-6 py-4">
-                                <button onClick={() => handleViewLogs(job.name)} className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1">
-                                    <Terminal size={14} /> Logs
-                                </button>
-                            </td>
-                        </tr>
-                    ))}
-                    {jobs.length === 0 && (
-                        <tr><td colSpan="6" className="px-6 py-8 text-center text-slate-400">No active jobs</td></tr>
-                    )}
-                </tbody>
-            </table>
+        <>
+            <SmartTable
+                columns={columns}
+                data={jobs}
+                showRowNumber={true}
+            />
 
             {/* Log Modal */}
             {selectedJob && (
@@ -86,7 +82,7 @@ export default function JobTable({ jobs, baseUrl }) {
                     />
                 </div>
             )}
-        </div>
+        </>
     );
 }
 
@@ -215,7 +211,8 @@ function StatusBadge({ status }) {
         Running: "bg-blue-100 text-blue-700",
         Succeeded: "bg-green-100 text-green-700",
         Failed: "bg-red-100 text-red-700",
-        Terminating: "bg-orange-100 text-orange-700"
+        Terminating: "bg-orange-100 text-orange-700",
+        Pending: "bg-yellow-100 text-yellow-700"
     };
     return (
         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${styles[status] || "bg-gray-100 text-gray-700"}`}>
