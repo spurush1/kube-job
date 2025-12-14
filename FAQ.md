@@ -119,3 +119,67 @@ kubectl rollout restart deployment scaler
 # Restart all workers (delete them, Scaler will respawn if needed)
 kubectl delete jobs -l app=worker-job
 ```
+
+## 👩‍💻 Developer Guide: Adding a New Worker
+
+Want to process a new type of task (e.g., "Risk Analysis")?
+
+### Step 1: Create Worker Code
+Create a folder `samples/worker-risk/` and add `main.py` (copy from `samples/worker-spend/`).
+Key logic:
+1.  Connect to RabbitMQ.
+2.  Consume commands.
+3.  **Important**: Send Audit Reports to Scaler API.
+    ```python
+    requests.post(SCALER_URL + "-message", json={
+        "message_id": msg_id,
+        "job_type": "risk-analysis",
+        "status": "SUCCESS",
+        ...
+    })
+    ```
+
+### Step 2: Containerize
+Add a `Dockerfile`:
+```dockerfile
+FROM python:3.9-slim
+WORKDIR /app
+RUN pip install pika requests
+COPY main.py .
+CMD ["python", "-u", "main.py"]
+```
+
+### Step 3: Register in Config
+Edit `platform/jobs.config.json`. Add your new type:
+```json
+"risk-analysis": {
+    "queue": "risk_queue",
+    "image": "risk-worker:latest",
+    "threshold": 10
+}
+```
+
+### Step 4: Build & Push
+1.  **Build & Tag**:
+    ```bash
+    docker build -t your-username/risk-worker:latest ./samples/worker-risk
+    ```
+
+2.  **Push to DockerHub** (Required for K8s to pull it):
+    ```bash
+    docker login
+    docker push your-username/risk-worker:latest
+    ```
+    *Note: Update `jobs.config.json` to use `your-username/risk-worker:latest`.*
+
+### Step 5: Deploy
+1.  **Restart Scaler**:
+    The scaler needs to read the new config.
+    ```bash
+    kubectl rollout restart deployment scaler
+    ```
+
+2.  **Submit Tasks**:
+    ```bash
+    curl -F "file=@data.csv" http://localhost:8000/submit/risk-analysis
+    ```
