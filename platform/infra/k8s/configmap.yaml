@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jobs-config
+data:
+  jobs.config.json: |
+    {
+      "jobs": {
+        "spend-analysis": {
+          "queue": "queue_spend",
+          "image": "worker:latest",
+          "threshold": 10
+        },
+        "translation": {
+          "queue": "queue_trans",
+          "image": "worker:latest",
+          "threshold": 5
+        }
+      }
+    }

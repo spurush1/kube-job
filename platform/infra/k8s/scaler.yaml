@@ -4,26 +4,27 @@ metadata:
   name: scaler-sa
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
+kind: ClusterRole
 metadata:
   name: job-manager
 rules:
-- apiGroups: ["batch"]
+- apiGroups: ["batch", "extensions"]
   resources: ["jobs"]
   verbs: ["create", "list", "get", "delete", "watch"]
 - apiGroups: [""]
-  resources: ["pods", "pods/log"]
+  resources: ["pods", "pods/log", "nodes", "events"]
   verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
+kind: ClusterRoleBinding
 metadata:
   name: job-manager-binding
 subjects:
 - kind: ServiceAccount
   name: scaler-sa
+  namespace: default
 roleRef:
-  kind: Role
+  kind: ClusterRole
   name: job-manager
   apiGroup: rbac.authorization.k8s.io
 ---
@@ -50,13 +51,29 @@ spec:
         - containerPort: 8000
         env:
         - name: RABBITMQ_HOST
-          value: rabbitmq
-        - name: MAX_JOBS
-          value: "100"
+          value: "rabbitmq"
         - name: NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        - name: MAX_JOBS
+          value: "10"
+        envFrom:
+        - configMapRef:
+            name: platform-env
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+        - name: logs-volume
+          mountPath: /logs
+      volumes:
+      - name: config-volume
+        configMap:
+          name: jobs-config
+      - name: logs-volume
+        hostPath:
+          path: /Users/purushsimhan/learning/kube-job/logs
+          type: DirectoryOrCreate
 ---
 apiVersion: v1
 kind: Service

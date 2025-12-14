@@ -1,0 +1,16 @@
+{
+    "jobs": {
+        "spend-analysis": {
+            "queue": "spend_queue",
+            "image": "purushsimhan/worker-spend:fixed",
+            "pull_secret": "${SECRET_NAME}",
+            "threshold": 10
+        },
+        "translation": {
+            "queue": "translation_queue",
+            "image": "purushsimhan/worker-trans:latest",
+            "pull_secret": "${SECRET_NAME}",
+            "threshold": 5
+        }
+    }
+}

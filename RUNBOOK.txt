@@ -1,0 +1,51 @@
+### 1. Setup Authentication
+Initialize your secrets (Docker Hub & K8s).
+```bash
+# Ensure .secrets.env exists with your TOKEN
+./setup_auth.sh
+```
+
+### 2. Build & Push Workers
+Build the worker images and push them to your private registry.
+```bash
+./samples/push.sh samples/worker-spend purushsimhan/worker-spend:latest
+./samples/push.sh samples/worker-trans purushsimhan/worker-trans:latest
+```
+
+### 3. Start the Platform
+Deploy RabbitMQ, Postgres, Scaler, Producer, and Dashboard.
+```bash
+./platform/manage.sh up
+```
+
+### 4. Connect to Services
+Open a **new terminal** to keep the tunnels running.
+```bash
+./platform/manage.sh forward
+```
+*   **Dashboard**: [http://localhost:9090](http://localhost:9090)
+*   **API**: [http://localhost:8080](http://localhost:8080)
+
+### 5. Generate & Information
+Generate 50 rows of test data.
+```bash
+python3 testing/data_gen.py 50
+```
+
+### 6. Submit a Job
+Upload the data to trigger the `spend-analysis` flow.
+```bash
+curl -X POST -F "file=@testing/data.csv" http://localhost:8000/submit/spend-analysis
+```
+
+### 7. Watch it Run!
+You can watch the **Web Dashboard** or use the **CLI**:
+```bash
+./monitor.sh
+```
+
+---
+**Tip**: If you want to shut everything down cleanly:
+```bash
+./platform/manage.sh down
+```

@@ -18,9 +18,13 @@ spec:
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
-        env:
-        - name: RABBITMQ_HOST
-          value: rabbitmq
+        volumeMounts:
+        - name: config-volume
+          mountPath: /app/config
+      volumes:
+      - name: config-volume
+        configMap:
+          name: jobs-config
 ---
 apiVersion: v1
 kind: Service
